@@ -1,5 +1,5 @@
 {
-  "name": "zhuan-le-ge-zhuan",
+  "name": "zhuan-le-ge-zhuan-zhuan",
   "version": "1.0.0",
   "scripts": {
     "type-check": "vue-tsc --noEmit",

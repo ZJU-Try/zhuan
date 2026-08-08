@@ -1,17 +1,33 @@
 import type { Board, Cell, Direction, GameConfig, IconId, MatchPair } from '@/types/game'
 
-/** 默认配置：8x8，6 种图标 */
+/** 默认配置（第 1 关）：8x10，8 种图标 */
 export const DEFAULT_CONFIG: GameConfig = {
   rows: 8,
-  cols: 8,
-  iconCount: 6,
+  cols: 10,
+  iconCount: 8,
 }
 
 /**
  * 图标素材（按 IconId 索引，0 为空）。
  * 可替换为图片路径，UI 层按 id 取用。
  */
-export const ICONS: string[] = ['', '🍎', '🍊', '🍋', '🍇', '🍓', '🍑']
+export const ICONS: string[] = [
+  '', '🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝',
+  '🍍', '🥭', '🍌', '🍉', '🍐', '🥥', '🥑', '🍈', '🍅', '🍆', '🫐',
+]
+
+/**
+ * 根据关卡数计算游戏配置。
+ * 公式：关卡数 n，矩阵 = (8 + floor(n/5)) × (10 + floor(n/5))，图标种类 = 8 + floor(n/5)
+ */
+export function getLevelConfig(level: number): GameConfig {
+  const step = Math.floor(level / 5)
+  return {
+    rows: 10 + step,
+    cols: 8 + step,
+    iconCount: 8 + step,
+  }
+}
 
 /** 各方向的行列增量 */
 const DELTA: Record<Direction, Cell> = {

@@ -8,6 +8,10 @@
   >
     <!-- 顶部状态栏 -->
     <view class="hud">
+      <view class="level-wrap">
+        <text class="label">关卡</text>
+        <text class="level">{{ store.level }}</text>
+      </view>
       <view class="timer-wrap">
         <text class="label">用时</text>
         <text class="timer">{{ store.formatTime() }}</text>
@@ -17,7 +21,7 @@
         <text class="status" v-else-if="store.stuck">😢 游戏失败</text>
         <text class="status" v-else>进行中</text>
       </view>
-      <button class="reset-btn" size="mini" @click="store.reset()">重开</button>
+      <button class="reset-btn" size="mini" @click="store.retryLevel()">重开</button>
     </view>
 
     <!-- 棋盘 -->
@@ -42,12 +46,12 @@
             candidate: isCandidateCell(r, c),
             shaking: isShakingCell(icon),
           }"
-          :style="cellStyle(r, c)"
+          :style="{ ...cellStyle(r, c), width: cellRpx + 'rpx', height: cellRpx + 'rpx' }"
           @touchstart="onDown(r, c, $event)"
           @mousedown.prevent="onDown(r, c, $event)"
           @click="onCandidateClick(r, c)"
         >
-          <text v-if="icon !== 0" class="icon">{{ ICONS[icon] }}</text>
+          <text v-if="icon !== 0" class="icon" :style="{ fontSize: iconFontSize + 'rpx' }">{{ ICONS[icon] }}</text>
         </view>
       </template>
     </view>
@@ -66,9 +70,9 @@
     <!-- 通关弹层 -->
     <view v-if="store.won" class="win-mask" @touchstart.stop.prevent="noop">
       <view class="win-card">
-        <text class="win-title">🎉 通关！</text>
+        <text class="win-title">🎉 第 {{ store.level }} 关通关！</text>
         <text class="win-time">用时 {{ store.formatTime() }}</text>
-        <button class="win-btn" @click="store.reset()">再来一局</button>
+        <button class="win-btn" @click="store.nextLevel()">下一关</button>
       </view>
     </view>
 
@@ -77,7 +81,7 @@
       <view class="win-card">
         <text class="win-title" style="color: #f44336;">😢 游戏失败</text>
         <text class="win-time">用时 {{ store.formatTime() }}</text>
-        <button class="win-btn" @click="store.reset()">重新开始</button>
+        <button class="win-btn" @click="store.retryLevel()">重新挑战本关</button>
       </view>
     </view>
   </view>
@@ -96,14 +100,22 @@ onMounted(() => {
   store.reset()
 })
 
-const CELL_RPX = 76
 const GAP_RPX = 6
-const STEP_RPX = CELL_RPX + GAP_RPX // 平移一格的距离（含间距）
 const DIR_LOCK_THRESHOLD_PX = 6 // 确定方向的最小位移
 const SNAP_MS = 180 // 吸附/回弹动画时长
 
+// 动态格子大小：根据列数自适应屏幕宽度
+// 可用宽度 = 750rpx(屏宽) - 48rpx(外层padding) - 24rpx(棋盘padding)
+const cellRpx = computed(() => {
+  const cols = store.config.cols
+  const available = 750 - 48 - 24
+  return Math.floor((available - (cols - 1) * GAP_RPX) / cols)
+})
+const stepRpx = computed(() => cellRpx.value + GAP_RPX)
+const iconFontSize = computed(() => Math.floor(cellRpx.value * 0.62))
+
 const boardStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${store.config.cols}, ${CELL_RPX}rpx)`,
+  gridTemplateColumns: `repeat(${store.config.cols}, ${cellRpx.value}rpx)`,
 }))
 
 // 屏幕宽度（px），用于 px <-> rpx 换算
@@ -113,7 +125,7 @@ try {
 } catch (e) {
   screenWpx = typeof window !== 'undefined' ? window.innerWidth : 375
 }
-const stepPx = (STEP_RPX * screenWpx) / 750
+const stepPx = computed(() => (stepRpx.value * screenWpx) / 750)
 
 // 拖拽响应式状态
 const dragOffsetRpx = ref(0) // 沿当前方向的正位移（>=0）
@@ -192,9 +204,9 @@ function onMove(e: any) {
   // 沿当前方向的正位移，限制 [0, maxSteps * stepPx]
   let proj = res.proj
   if (proj < 0) proj = 0
-  const maxOffsetPx = maxSteps * stepPx
+  const maxOffsetPx = maxSteps * stepPx.value
   if (proj > maxOffsetPx) proj = maxOffsetPx
-  dragOffsetRpx.value = (proj / stepPx) * STEP_RPX
+  dragOffsetRpx.value = (proj / stepPx.value) * stepRpx.value
 }
 
 function onUp(e: any) {
@@ -221,7 +233,7 @@ function onUp(e: any) {
   }
 
   // 落位格数（四舍五入，至少1格）
-  const steps = Math.max(1, Math.min(maxSteps, Math.round(dragOffsetRpx.value / STEP_RPX)))
+  const steps = Math.max(1, Math.min(maxSteps, Math.round(dragOffsetRpx.value / stepRpx.value)))
 
   // 预判：移动后，被点击图标新位置是否有可消除对（全方向判别，与点击一致）
   const moved = applyMove(store.board, start, dir, steps)
@@ -230,7 +242,7 @@ function onUp(e: any) {
 
   // 吸附到目标格
   animating.value = true
-  dragOffsetRpx.value = steps * STEP_RPX
+  dragOffsetRpx.value = steps * stepRpx.value
 
   setTimeout(() => {
     if (hasMatch) {
@@ -304,9 +316,10 @@ function noop() {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  max-width: 640rpx;
+  max-width: 680rpx;
   margin-bottom: 28rpx;
 }
+.level-wrap,
 .timer-wrap,
 .status-wrap {
   display: flex;
@@ -315,6 +328,12 @@ function noop() {
 .label {
   font-size: 22rpx;
   color: #999;
+}
+.level {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #ff9800;
+  font-variant-numeric: tabular-nums;
 }
 .timer {
   font-size: 44rpx;
@@ -343,8 +362,6 @@ function noop() {
 }
 .cell {
   position: relative;
-  width: 76rpx;
-  height: 76rpx;
   background: #ffffff;
   border-radius: 10rpx;
   display: flex;
@@ -383,7 +400,6 @@ function noop() {
   }
 }
 .icon {
-  font-size: 48rpx;
   line-height: 1;
   pointer-events: none;
 }

@@ -2,18 +2,20 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Cell, Direction, GameConfig, IconId, MatchPair } from '@/types/game'
 import {
-  DEFAULT_CONFIG,
   applyMove,
   eliminate,
   findPairsForCell,
   generateBoard,
+  getLevelConfig,
   isCleared,
   isStuck,
   shiftCell,
 } from '@/utils/gameEngine'
 
 export const useGameStore = defineStore('game', () => {
-  const config = ref<GameConfig>({ ...DEFAULT_CONFIG })
+  /** 当前关卡（从 1 开始） */
+  const level = ref(1)
+  const config = ref<GameConfig>(getLevelConfig(1))
   const board = ref(generateBoard(config.value))
   const selected = ref<Cell | null>(null)
   const elapsedMs = ref(0)
@@ -174,8 +176,11 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function reset() {
+  /** 初始化指定关卡的棋盘 */
+  function startLevel(lv: number) {
     stopTimer()
+    level.value = lv
+    config.value = getLevelConfig(lv)
     // generateBoard 内部已保证生成的棋盘不是死局（玩家一定有可消除操作）
     board.value = generateBoard(config.value)
     selected.value = null
@@ -191,12 +196,27 @@ export const useGameStore = defineStore('game', () => {
     startTimer()
     // 安全兜底：理论上 generateBoard 已保证非死局，此处仅作防御性检测
     if (isStuck(board.value)) {
-      // 极端情况下重试一次 generateBoard（通常不会触发）
       board.value = generateBoard(config.value)
     }
   }
 
+  /** 进入下一关 */
+  function nextLevel() {
+    startLevel(level.value + 1)
+  }
+
+  /** 重新挑战当前关 */
+  function retryLevel() {
+    startLevel(level.value)
+  }
+
+  /** 从第 1 关重新开始整个游戏 */
+  function reset() {
+    startLevel(1)
+  }
+
   return {
+    level,
     config,
     board,
     selected,
@@ -211,6 +231,8 @@ export const useGameStore = defineStore('game', () => {
     select,
     tryMove,
     tryClickEliminate,
+    nextLevel,
+    retryLevel,
     reset,
     isChoosing,
     cancelChoose,
