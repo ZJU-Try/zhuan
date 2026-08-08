@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: GameConfig = {
 export const ICONS: string[] = [
   '', '🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝',
   '🍍', '🥭', '🍌', '🍉', '🍐', '🥥', '🥑', '🍈', '🍅', '🍆', '🫐',
+  '🥔', '🥕', '🌽', '🌶️', '🫑', '🥬', '🥦', '🧄', '🧅', '🍄', '🥜', '🌰', '🥨',
 ]
 
 /**
@@ -25,7 +26,7 @@ export function getLevelConfig(level: number): GameConfig {
   return {
     rows: 10 + step,
     cols: 8 + step,
-    iconCount: 8 + step,
+    iconCount: 12 + step,
   }
 }
 
@@ -330,11 +331,19 @@ export function generateBoard(config: GameConfig, emptyRatio = 0): Board {
     shuffle(fillCells)
     let innerGuard = 0
     let pairs = fillCells.length / 2
+    // 无空格模式：追踪消除对最少的棋盘，提高离散度
+    let bestBoard: Board | null = null
+    let bestPairCount = Infinity
+    // 从图标库中随机选取 iconCount 种图标（不固定使用前 N 种）
+    const allIconIds: IconId[] = []
+    for (let i = 1; i < ICONS.length; i++) allIconIds.push(i)
+    shuffle(allIconIds)
+    const selectedIcons = allIconIds.slice(0, iconCount)
     // 内层循环：尝试满足初始配对条件
     while (innerGuard < 60) {
       const iconsPool: IconId[] = []
       for (let p = 0; p < pairs; p++) {
-        const icon = 1 + (p % iconCount)
+        const icon = selectedIcons[p % iconCount]
         iconsPool.push(icon, icon)
       }
       shuffle(iconsPool)
@@ -342,13 +351,22 @@ export function generateBoard(config: GameConfig, emptyRatio = 0): Board {
         const idx = fillCells[i]
         board[Math.floor(idx / cols)][idx % cols] = iconsPool[i]
       }
-      // 有空格时禁止初始配对（需通过移动创造配对）；无空格时允许初始配对供玩家开局
+      // 有空格时禁止初始配对（需通过移动创造配对）；无空格时选消除对最少的
       if (hasEmpties) {
         if (findCandidateGroups(board).length === 0) break
       } else {
-        if (findCandidateGroups(board).length > 0) break
+        const pairCount = findCandidateGroups(board).length
+        if (pairCount > 0 && pairCount < bestPairCount) {
+          bestPairCount = pairCount
+          bestBoard = cloneBoard(board)
+        }
       }
       innerGuard++
+    }
+
+    // 无空格模式使用消除对最少的棋盘
+    if (!hasEmpties && bestBoard) {
+      if (!isStuck(bestBoard)) return bestBoard
     }
     // 关键：确保初始棋盘不是死局，玩家一定有可进行的消除操作
     if (!isStuck(board)) {
@@ -370,9 +388,14 @@ function buildGuaranteedBoard(config: GameConfig): Board {
   // 先填满棋盘，保证偶数对
   const total = rows * cols
   const pairs = Math.floor(total / 2)
+  // 随机选取图标
+  const allIconIds: IconId[] = []
+  for (let i = 1; i < ICONS.length; i++) allIconIds.push(i)
+  shuffle(allIconIds)
+  const selectedIcons = allIconIds.slice(0, iconCount)
   const iconsPool: IconId[] = []
   for (let p = 0; p < pairs; p++) {
-    const icon = 1 + (p % iconCount)
+    const icon = selectedIcons[p % iconCount]
     iconsPool.push(icon, icon)
   }
   shuffle(iconsPool)
@@ -381,8 +404,9 @@ function buildGuaranteedBoard(config: GameConfig): Board {
   }
   // 强制在第一行创造两个相邻的相同图标，确保至少有一对可消除
   if (cols >= 2) {
-    board[0][0] = 1
-    board[0][1] = 1
+    const safeIcon = selectedIcons[0]
+    board[0][0] = safeIcon
+    board[0][1] = safeIcon
   }
   return board
 }

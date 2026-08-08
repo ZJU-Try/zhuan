@@ -12,10 +12,32 @@ import {
   shiftCell,
 } from '@/utils/gameEngine'
 
+const LEVEL_STORAGE_KEY = 'zhuan_level'
+
+/** 从本地存储读取上次关卡，默认第 1 关 */
+function loadSavedLevel(): number {
+  try {
+    const saved = uni.getStorageSync(LEVEL_STORAGE_KEY)
+    if (saved && typeof saved === 'number' && saved >= 1) return saved
+  } catch (e) {
+    // 存储不可用时回退到第 1 关
+  }
+  return 1
+}
+
+/** 保存当前关卡到本地存储 */
+function saveLevel(lv: number) {
+  try {
+    uni.setStorageSync(LEVEL_STORAGE_KEY, lv)
+  } catch (e) {
+    // 忽略写入失败
+  }
+}
+
 export const useGameStore = defineStore('game', () => {
-  /** 当前关卡（从 1 开始） */
-  const level = ref(1)
-  const config = ref<GameConfig>(getLevelConfig(1))
+  /** 当前关卡（从 1 开始，初始从本地存储恢复） */
+  const level = ref(loadSavedLevel())
+  const config = ref<GameConfig>(getLevelConfig(level.value))
   const board = ref(generateBoard(config.value))
   const selected = ref<Cell | null>(null)
   const elapsedMs = ref(0)
@@ -180,6 +202,7 @@ export const useGameStore = defineStore('game', () => {
   function startLevel(lv: number) {
     stopTimer()
     level.value = lv
+    saveLevel(lv)
     config.value = getLevelConfig(lv)
     // generateBoard 内部已保证生成的棋盘不是死局（玩家一定有可消除操作）
     board.value = generateBoard(config.value)
@@ -210,9 +233,9 @@ export const useGameStore = defineStore('game', () => {
     startLevel(level.value)
   }
 
-  /** 从第 1 关重新开始整个游戏 */
+  /** 初始化游戏：从本地存储恢复上次关卡（首次打开为第 1 关） */
   function reset() {
-    startLevel(1)
+    startLevel(loadSavedLevel())
   }
 
   return {

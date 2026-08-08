@@ -68,20 +68,20 @@
     </view>
 
     <!-- 通关弹层 -->
-    <view v-if="store.won" class="win-mask" @touchstart.stop.prevent="noop">
+    <view v-if="store.won" class="win-mask" @touchmove.stop.prevent="noop" @click.stop="noop">
       <view class="win-card">
         <text class="win-title">🎉 第 {{ store.level }} 关通关！</text>
         <text class="win-time">用时 {{ store.formatTime() }}</text>
-        <button class="win-btn" @click="store.nextLevel()">下一关</button>
+        <button class="win-btn" @click.stop="store.nextLevel()">下一关</button>
       </view>
     </view>
 
     <!-- 游戏失败弹层 -->
-    <view v-if="store.stuck" class="win-mask" @touchstart.stop.prevent="noop">
+    <view v-if="store.stuck" class="win-mask" @touchmove.stop.prevent="noop" @click.stop="noop">
       <view class="win-card">
         <text class="win-title" style="color: #f44336;">😢 游戏失败</text>
         <text class="win-time">用时 {{ store.formatTime() }}</text>
-        <button class="win-btn" @click="store.retryLevel()">重新挑战本关</button>
+        <button class="win-btn" @click.stop="store.retryLevel()">重新挑战本关</button>
       </view>
     </view>
   </view>
